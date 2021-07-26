@@ -3,5 +3,6 @@
 
 enum class State {
 	Title,
-	Game
+	Game,
+	Result
 };

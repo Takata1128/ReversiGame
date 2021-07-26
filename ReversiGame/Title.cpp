@@ -4,29 +4,49 @@
 class Title :public MyApp::Scene {
 private:
 
-	Rect m_startButton = Rect(Arg::center = Scene::Center().movedBy(0, 0), 300, 60);
-	Transition m_startTransition = Transition(0.4s, 0.2s);
+	Rect button_weak = Rect(Arg::center = Scene::Center().movedBy(-250, 0), 200, 60);
+	Transition button_weak_transition = Transition(0.4s, 0.2s);
 
-	Rect m_exitButton = Rect(Arg::center = Scene::Center().movedBy(0, 100), 300, 60);
-	Transition m_exitTransition = Transition(0.4s, 0.2s);
+	Rect button_normal = Rect(Arg::center = Scene::Center().movedBy(0, 0), 200, 60);
+	Transition button_normal_transition = Transition(0.4s, 0.2s);
+
+	Rect button_strong = Rect(Arg::center = Scene::Center().movedBy(250, 0), 200, 60);
+	Transition button_strong_transition = Transition(0.4s, 0.2s);
+
+	Rect button_exit = Rect(Arg::center = Scene::Center().movedBy(0, 100), 300, 60);
+	Transition button_exit_transition = Transition(0.4s, 0.2s);
 
 
 public:
 	Title(const InitData& init) :IScene(init) {}
 
 	void update() override {
-		m_startTransition.update(m_startButton.mouseOver());
-		m_exitTransition.update(m_exitButton.mouseOver());
+		button_weak_transition.update(button_weak.mouseOver());
+		button_normal_transition.update(button_normal.mouseOver());
+		button_strong_transition.update(button_strong.mouseOver());
+		button_exit_transition.update(button_exit.mouseOver());
 
-		if (m_startButton.mouseOver() || m_exitButton.mouseOver()) {
+
+		if (button_weak.mouseOver() || button_exit.mouseOver()) {
 			Cursor::RequestStyle(CursorStyle::Hand);
 		}
 
-		if (m_startButton.leftClicked()) {
+		if (button_weak.leftClicked()) {
+			getData().cpuType = 0;
 			changeScene(State::Game);
 		}
 
-		if (m_exitButton.leftClicked()) {
+		if (button_normal.leftClicked()) {
+			getData().cpuType = 1;
+			changeScene(State::Game);
+		}
+
+		if (button_strong.leftClicked()) {
+			getData().cpuType = 2;
+			changeScene(State::Game);
+		}
+
+		if (button_exit.leftClicked()) {
 			System::Exit();
 		}
 	}
@@ -37,13 +57,15 @@ public:
 		FontAsset(U"Title")(titleText).drawAt(center.movedBy(4, 6), ColorF(0.0, 0.5));
 		FontAsset(U"Title")(titleText).drawAt(center);
 
-		m_startButton.draw(ColorF(1.0, m_startTransition.value())).drawFrame(2);
-		m_exitButton.draw(ColorF(1.0, m_exitTransition.value())).drawFrame(2);
+		button_weak.draw(ColorF(1.0, button_weak_transition.value())).drawFrame(2);
+		button_normal.draw(ColorF(1.0, button_normal_transition.value())).drawFrame(2);
+		button_strong.draw(ColorF(1.0, button_strong_transition.value())).drawFrame(2);
+		button_exit.draw(ColorF(1.0, button_exit_transition.value())).drawFrame(2);
 
-		FontAsset(U"Menu")(U"‚Í‚¶‚ß‚é").drawAt(m_startButton.center(), ColorF(0.25));
-		FontAsset(U"Menu")(U"‚¨‚í‚é").drawAt(m_exitButton.center(), ColorF(0.25));
+		FontAsset(U"Menu")(U"‚æ‚í‚¢").drawAt(button_weak.center(), ColorF(0.25));
+		FontAsset(U"Menu")(U"‚Ó‚Â‚¤").drawAt(button_normal.center(), ColorF(0.25));
+		FontAsset(U"Menu")(U"‚Â‚æ‚¢").drawAt(button_strong.center(), ColorF(0.25));
+		FontAsset(U"Menu")(U"‚¨‚í‚é").drawAt(button_exit.center(), ColorF(0.25));
 
-		const int32 highScore = getData().score;
-		FontAsset(U"Score")(U"High score: {}"_fmt(highScore)).drawAt(Vec2(620, 550));
 	}
 };

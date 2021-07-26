@@ -1,10 +1,12 @@
 #pragma once
 #include "Define.h"
+#include "SimpleState.cpp"
+#include "Agent.cpp"
 
 enum CellState {
-	None = 0,
-	Black = 1,
-	White = 2
+	None = -1,
+	Black = 0,
+	White = 1
 };
 
 class GameState {
@@ -13,7 +15,8 @@ private:
 	const static int OFFSET = 20;
 	int m_height, m_width;
 	int m_cell_size;
-	int m_black_count, m_white_count;
+	SimpleState state;
+	
 
 	class Cell {
 	private:
@@ -31,18 +34,14 @@ private:
 			m_stone = Circle(OFFSET + m_size * y + m_size / 2, OFFSET + m_size * x + m_size / 2, m_size / 3);
 			m_clickable_marker = Circle(OFFSET + m_size * y + m_size / 2, OFFSET + m_size * x + m_size / 2, m_size / 6);
 		}
-		bool turn(CellState next) {
+		
+		bool select() {
 			if (m_clickable && m_rect.leftClicked()) {
-				m_state = next;
 				return true;
 			}
 			return false;
 		}
-		void update() {
-			if (m_clickable && m_rect.leftClicked()) {
-				m_state = CellState::Black;
-			}
-		}
+
 		void draw() const {
 			m_rect.drawFrame(2, Palette::Black);
 			if (m_state == CellState::Black) {
@@ -54,12 +53,6 @@ private:
 			if (m_clickable) {
 				m_clickable_marker.draw(Palette::Orange);
 			}
-		}
-
-		CellState back() {
-			if (m_state == CellState::Black)return CellState::White;
-			else if (m_state == CellState::White)return CellState::Black;
-			else return CellState::None;
 		}
 
 		void set_state(CellState state) {
@@ -88,152 +81,85 @@ private:
 public:
 	GameState(std::initializer_list<std::initializer_list<int>> init) {
 		std::vector<std::vector<int>> tmp_board(init.begin(), init.end());
+		state = SimpleState(tmp_board,0);
 		m_height = tmp_board.size();
 		m_width = tmp_board[0].size();
 		m_cell_size = BOARD_HEIGHT / m_height;
-		m_black_count = 0, m_white_count = 0;
 		m_board.assign(m_height, std::vector<Cell>(m_width, Cell()));
+		update_board();
+	}
+
+	void update_board() {
 		for (int i = 0; i < m_height; i++) {
 			for (int j = 0; j < m_width; j++) {
-				m_board[i][j] = Cell(CellState(tmp_board[i][j]), i, j, m_cell_size);
-				if (tmp_board[i][j] == CellState::Black) {
-					m_black_count++;
-				}
-				else if (tmp_board[i][j] == CellState::White) {
-					m_white_count++;
-				}
+				this->m_board[i][j] = Cell(CellState(this->state.getColor(i, j)), i, j, m_cell_size);
 			}
 		}
-		reset_clickable();
-	}
-	GameState(int height, int width) :m_height(height), m_width(width), m_cell_size(BOARD_HEIGHT / height), m_black_count(0), m_white_count(0) {
-		this->m_board.resize(height);
-		for (int i = 0; i < height; i++) {
-			m_board[i].resize(width, Cell());
-		}
-
-		for (int i = 0; i < height; i++) {
-			for (int j = 0; j < width; j++) {
-				m_board[i][j] = Cell(CellState::None, i, j, m_cell_size);
-			}
-		}
-	}
-
-	int get_black_count() const {
-		return m_black_count;
-	}
-
-	void set_black_count(int black) {
-		m_black_count = black;
-	}
-
-	int get_white_count() const {
-		return m_white_count;
-	}
-
-	void set_white_count(int white) {
-		m_white_count = white;
-	}
-
-	int get_stone_count() const {
-		return m_black_count + m_white_count;
-	}
-
-	std::pair<int, int> recount() {
-		int black = 0, white = 0;
-		for (int i = 0; i < m_height; i++) {
-			for (int j = 0; j < m_width; j++) {
-				if (m_board[i][j].get_state() == CellState::Black) {
-					black++;
-				}
-				else if (m_board[i][j].get_state() == CellState::White) {
-					white++;
-				}
-			}
-		}
-		return std::make_pair(black, white);
-	}
-
-	bool is_first_turn() const {
-		return get_stone_count() % 2 == 0;
-	}
-
-	CellState currentStone() const {
-		return is_first_turn() ? CellState::Black : CellState::White;
-	}
-
-	bool is_terminal() const {
-		return get_stone_count() == m_height * m_width;
-	}
-
-	void update() {
-		bool isUpdated = false;
-		int py = 0, px = 0;
-		for (int i = 0; i < m_height; i++) {
-			for (int j = 0; j < m_width; j++) {
-				bool b = m_board[i][j].turn(currentStone());
-				if (b) {
-					py = i, px = j;
-				}
-				isUpdated |= b;
-			}
-		}
-		if (isUpdated) {
-			m_board = calc(py, px, currentStone()).first;
-			auto [b, w] = recount();
-			set_black_count(b);
-			set_white_count(w);
-			reset_clickable();
-		}
-
-	}
-
-	std::pair<std::vector<std::vector<Cell>>, int> calc(int y, int x, CellState color) {
-		std::vector<std::vector<Cell>> next_board = m_board;
-		std::vector<std::pair<int, int>> updates;
-		next_board[y][x].set_state(color);
-		// 更新
-		CellState baseState = next_board[y][x].get_state();
-		for (int dy = -1; dy <= 1; dy++) {
-			for (int dx = -1; dx <= 1; dx++) {
-				if (dx == 0 && dy == 0)continue;
-				std::vector<std::pair<int, int>> tmp;
-				int nx = x + dx, ny = y + dy;
-				while (0 <= nx && nx < m_width && 0 <= ny && ny < m_height && m_board[ny][nx].get_state() != CellState::None) {
-					if (baseState != m_board[ny][nx].get_state())
-						tmp.emplace_back(ny, nx);
-					else {
-						for (auto p : tmp) {
-							updates.push_back(p);
-						}
-						break;
-					}
-					nx += dx, ny += dy;
-				}
-			}
-		}
-		for (auto [py, px] : updates) {
-			next_board[py][px].set_state(baseState);
-		}
-		return std::make_pair(next_board, updates.size());
-	}
-
-	void reset_clickable() {
+		auto legal_actions = state.legal_actions();
 		for (int i = 0; i < m_height; i++) {
 			for (int j = 0; j < m_width; j++) {
 				m_board[i][j].set_clickable(false);
 			}
 		}
-		for (int i = 0; i < m_height; i++) {
-			for (int j = 0; j < m_width; j++) {
-				if (m_board[i][j].get_state() != CellState::None)continue;
-				auto p = calc(i, j, currentStone());
-				if (p.second != 0) {
-					m_board[i][j].set_clickable(true);
-				}
+		for (auto [y, x] : legal_actions) {
+			if (y >= 0 && x >= 0) {
+				m_board[y][x].set_clickable(true);
 			}
 		}
 	}
+
+	int get_black_count() const {
+		return is_first_turn() ? this->state.stone_count().first : this->state.stone_count().second;
+	}
+
+	int get_white_count() const {
+		return is_first_turn() ? this->state.stone_count().second: this->state.stone_count().first;
+	}
+
+	int get_stone_count() const {
+		return get_black_count() + get_white_count();
+	}
+
+	bool is_terminal() const {
+		return state.is_done();
+	}
+
+	bool is_first_turn() const{
+		return state.teban() == 0;
+	}
+
+	void update(bool pass) {
+		if (pass) {
+			take_action(-1, -1);
+		}
+		else {
+			bool isUpdated = false;
+			int py = 0, px = 0;
+			for (int i = 0; i < m_height; i++) {
+				for (int j = 0; j < m_width; j++) {
+					bool b = m_board[i][j].select();
+					if (b) {
+						py = i, px = j;
+					}
+					isUpdated |= b;
+				}
+			}
+			if (isUpdated) {
+				take_action(py, px);
+			}
+		}
+	}
+
+	void update_by_cpu(Agent &agent) {
+		auto [y, x] = agent.select_action(this->state);
+		take_action(y,x);
+	}
+
+	void take_action(int y, int x) {
+		this->state = state.next(std::make_pair(y, x));
+		update_board();
+	}
+
 
 	void draw() const {
 		for (int i = 0; i < m_height; i++) {
@@ -247,36 +173,72 @@ public:
 class Game :public MyApp::Scene {
 private:
 	bool isFirstTurn = 1;
+	Rect info_area_rect = Rect(Arg::center = Scene::Center().movedBy(250, 0), 300,600);
+	Rect m_passButton = Rect(Arg::center = Scene::Center().movedBy(250, 150), 200, 60);
+	Transition m_passTransition = Transition(0.4s, 0.2s);
+	std::unique_ptr<Agent> agent;
 
 public:
-	Game(const InitData& init) :IScene(init) {}
+	Game(const InitData& init) :IScene(init) {
+		int cpu_type = getData().cpuType;
+		if (cpu_type == 0) {
+			this->agent = std::make_unique<RandomAgent>();
+		}
+		else if (cpu_type == 1) {
+			this->agent = std::make_unique<MonteCalroAgent>();
+		}
+		else {
+			this->agent = std::make_unique<MonteCalroTreeAgent>();
+
+		}
+	}
 	GameState board = GameState(
 		{
-		{0,0,0,0,0,0,0,0},
-		{0,0,0,0,0,0,0,0},
-		{0,0,0,0,0,0,0,0},
-		{0,0,0,1,2,0,0,0},
-		{0,0,0,2,1,0,0,0},
-		{0,0,0,0,0,0,0,0},
-		{0,0,0,0,0,0,0,0},
-		{0,0,0,0,0,0,0,0}
+		{-1,-1,-1,-1,-1,-1,-1,-1},
+		{-1,-1,-1,-1,-1,-1,-1,-1},
+		{-1,-1,-1,-1,-1,-1,-1,-1},
+		{-1,-1,-1,1,0,-1,-1,-1},
+		{-1,-1,-1,0,1,-1,-1,-1},
+		{-1,-1,-1,-1,-1,-1,-1,-1},
+		{-1,-1,-1,-1,-1,-1,-1,-1},
+		{-1,-1,-1,-1,-1,-1,-1,-1}
 		}
 	);
 	void update() override {
-		board.update();
+		m_passTransition.update(m_passButton.mouseOver());
+		bool is_pass = m_passButton.leftClicked();
+		if (isFirstTurn) { // Human
+			board.update(is_pass);
+		}
+		else { // AI
+			board.update_by_cpu(*agent);
+		}
 		isFirstTurn = board.is_first_turn();
+		if (board.is_terminal()) {
+			getData().black = board.get_black_count();
+			getData().white = board.get_white_count();
+			getData().result = board.get_black_count() == board.get_white_count()?0:(board.get_black_count() < board.get_white_count()?2:1);
+			changeScene(State::Result);
+		}
 	}
 
-	void draw() const override {
+	void draw() const override{
 		board.draw();
+		info_area_rect.draw(Palette::Gray);
+
 		if (isFirstTurn) {
 			FontAsset(U"Info")(U"先手").drawAt(Vec2(620, 550), Palette::Black);
 		}
 		else {
+			FontAsset(U"Info")(U"CPU思考中...").drawAt(Scene::Center(), Palette::White);
 			FontAsset(U"Info")(U"後手").drawAt(Vec2(620, 550));
 		}
-		FontAsset(U"Info")(U"白石の数:{}"_fmt(board.get_white_count())).drawAt(Vec2(620, Scene::Center().movedBy(0, -100).y), Palette::White);
-		FontAsset(U"Info")(U"黒石の数:{}"_fmt(board.get_black_count())).drawAt(Vec2(620, Scene::Center().movedBy(0, -50).y), Palette::Black);
 
+
+		FontAsset(U"Info")(U"白石の数:{}"_fmt(board.get_white_count())).drawAt(Vec2(620, Scene::Center().movedBy(0, -250).y), Palette::White);
+		FontAsset(U"Info")(U"黒石の数:{}"_fmt(board.get_black_count())).drawAt(Vec2(620, Scene::Center().movedBy(0, -200).y), Palette::Black);
+
+		m_passButton.draw(ColorF(1.0, m_passTransition.value())).drawFrame(2);
+		FontAsset(U"Info")(U"パス").drawAt(m_passButton.center(), ColorF(0.25));
 	}
 };
