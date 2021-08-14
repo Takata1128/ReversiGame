@@ -16,7 +16,7 @@ private:
 	int m_height, m_width;
 	int m_cell_size;
 	SimpleState state;
-	
+
 
 	class Cell {
 	private:
@@ -34,7 +34,7 @@ private:
 			m_stone = Circle(OFFSET + m_size * y + m_size / 2, OFFSET + m_size * x + m_size / 2, m_size / 3);
 			m_clickable_marker = Circle(OFFSET + m_size * y + m_size / 2, OFFSET + m_size * x + m_size / 2, m_size / 6);
 		}
-		
+
 		bool select() {
 			if (m_clickable && m_rect.leftClicked()) {
 				return true;
@@ -81,7 +81,7 @@ private:
 public:
 	GameState(std::initializer_list<std::initializer_list<int>> init) {
 		std::vector<std::vector<int>> tmp_board(init.begin(), init.end());
-		state = SimpleState(tmp_board,0);
+		state = SimpleState(tmp_board, 0);
 		m_height = tmp_board.size();
 		m_width = tmp_board[0].size();
 		m_cell_size = BOARD_HEIGHT / m_height;
@@ -113,7 +113,7 @@ public:
 	}
 
 	int get_white_count() const {
-		return is_first_turn() ? this->state.stone_count().second: this->state.stone_count().first;
+		return is_first_turn() ? this->state.stone_count().second : this->state.stone_count().first;
 	}
 
 	int get_stone_count() const {
@@ -124,7 +124,7 @@ public:
 		return state.is_done();
 	}
 
-	bool is_first_turn() const{
+	bool is_first_turn() const {
 		return state.teban() == 0;
 	}
 
@@ -150,9 +150,9 @@ public:
 		}
 	}
 
-	void update_by_cpu(Agent &agent) {
+	void update_by_cpu(Agent& agent) {
 		auto [y, x] = agent.select_action(this->state);
-		take_action(y,x);
+		take_action(y, x);
 	}
 
 	void take_action(int y, int x) {
@@ -172,8 +172,9 @@ public:
 
 class Game :public MyApp::Scene {
 private:
-	bool isFirstTurn = 1;
-	Rect info_area_rect = Rect(Arg::center = Scene::Center().movedBy(250, 0), 300,600);
+	bool player_is_first;
+	bool is_first_turn = true;
+	Rect info_area_rect = Rect(Arg::center = Scene::Center().movedBy(250, 0), 300, 600);
 	Rect m_passButton = Rect(Arg::center = Scene::Center().movedBy(250, 150), 200, 60);
 	Transition m_passTransition = Transition(0.4s, 0.2s);
 	std::unique_ptr<Agent> agent;
@@ -181,6 +182,7 @@ private:
 public:
 	Game(const InitData& init) :IScene(init) {
 		int cpu_type = getData().cpuType;
+		this->player_is_first = getData().player_is_first;
 		if (cpu_type == 0) {
 			this->agent = std::make_unique<RandomAgent>();
 		}
@@ -189,7 +191,6 @@ public:
 		}
 		else {
 			this->agent = std::make_unique<MonteCalroTreeAgent>();
-
 		}
 	}
 	GameState board = GameState(
@@ -207,36 +208,51 @@ public:
 	void update() override {
 		m_passTransition.update(m_passButton.mouseOver());
 		bool is_pass = m_passButton.leftClicked();
-		if (isFirstTurn) { // Human
-			board.update(is_pass);
+
+		if (player_is_first) {
+			if (is_first_turn) { // Human
+				board.update(is_pass);
+			}
+			else { // AI
+				board.update_by_cpu(*agent);
+			}
 		}
-		else { // AI
-			board.update_by_cpu(*agent);
+		else {
+			if (is_first_turn) { // AI
+				board.update_by_cpu(*agent);
+			}
+			else { // Human
+				board.update(is_pass);
+			}
 		}
-		isFirstTurn = board.is_first_turn();
+
+		is_first_turn = board.is_first_turn();
 		if (board.is_terminal()) {
 			getData().black = board.get_black_count();
 			getData().white = board.get_white_count();
-			getData().result = board.get_black_count() == board.get_white_count()?0:(board.get_black_count() < board.get_white_count()?2:1);
+			int winner = 1, loser = 2;
+			if (!player_is_first)std::swap(winner, loser);
+			getData().result = board.get_black_count() == board.get_white_count() ? 0 : (board.get_black_count() > board.get_white_count() ? winner : loser);
 			changeScene(State::Result);
 		}
 	}
 
-	void draw() const override{
+	void draw() const override {
 		board.draw();
 		info_area_rect.draw(Palette::Gray);
 
-		if (isFirstTurn) {
-			FontAsset(U"Info")(U"先手").drawAt(Vec2(620, 550), Palette::Black);
+		if (is_first_turn) {
+			if (!player_is_first)FontAsset(U"Info")(U"CPU思考中...").drawAt(Scene::Center(), Palette::White);
+			FontAsset(U"Info")(U"先手：{}"_fmt(this->player_is_first ? U"あなた" : U"CPU")).drawAt(Vec2(620, 550), Palette::Black);
 		}
 		else {
-			FontAsset(U"Info")(U"CPU思考中...").drawAt(Scene::Center(), Palette::White);
-			FontAsset(U"Info")(U"後手").drawAt(Vec2(620, 550));
+			if (player_is_first)FontAsset(U"Info")(U"CPU思考中...").drawAt(Scene::Center(), Palette::White);
+			FontAsset(U"Info")(U"後手：{}"_fmt(this->player_is_first ? U"CPU" : U"あなた")).drawAt(Vec2(620, 550), Palette::White);
 		}
 
 
-		FontAsset(U"Info")(U"白石の数:{}"_fmt(board.get_white_count())).drawAt(Vec2(620, Scene::Center().movedBy(0, -250).y), Palette::White);
-		FontAsset(U"Info")(U"黒石の数:{}"_fmt(board.get_black_count())).drawAt(Vec2(620, Scene::Center().movedBy(0, -200).y), Palette::Black);
+		FontAsset(U"Info")(U"{}:{}"_fmt(this->player_is_first ? U"あなた" : U"CPU", this->player_is_first ? board.get_white_count() : board.get_black_count())).drawAt(Vec2(620, Scene::Center().movedBy(0, -250).y), this->player_is_first ? Palette::White : Palette::Black);
+		FontAsset(U"Info")(U"{}:{}"_fmt(this->player_is_first ? U"CPU" : U"あなた", this->player_is_first ? board.get_black_count() : board.get_white_count())).drawAt(Vec2(620, Scene::Center().movedBy(0, -200).y), this->player_is_first ? Palette::Black : Palette::White);
 
 		m_passButton.draw(ColorF(1.0, m_passTransition.value())).drawFrame(2);
 		FontAsset(U"Info")(U"パス").drawAt(m_passButton.center(), ColorF(0.25));

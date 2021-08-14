@@ -8,7 +8,7 @@ protected:
 	std::mt19937 mt;
 public:
 	Agent() :mt(rnd()) {}
-	virtual std::pair<int, int> select_action(SimpleState state)=0;
+	virtual std::pair<int, int> select_action(SimpleState state) = 0;
 };
 
 class RandomAgent :public Agent {
@@ -17,16 +17,16 @@ public:
 	std::pair<int, int> select_action(SimpleState state) {
 		auto legal_actions = state.legal_actions();
 		int n = legal_actions.size();
-		if (n >= 2){
+		if (n >= 2) {
 			legal_actions.pop_back();
 			n--;
 		}
-		else if(n==1) {
+		else if (n == 1) {
 			return legal_actions[0];
 		}
 		std::uniform_int_distribution<> rand(0, n - 1);
 		int idx = rand(mt);
-		assert(0<=idx && idx < legal_actions.size());
+		assert(0 <= idx && idx < legal_actions.size());
 		return legal_actions[idx];
 	}
 };
@@ -37,9 +37,13 @@ public:
 	MonteCalroAgent() {}
 	std::pair<int, int> select_action(SimpleState state) {
 		auto legal_actions = state.legal_actions();
+
+		// パス以外ができるならパスを除外
+		if (legal_actions.size() > 1)legal_actions.pop_back();
+
 		auto values = std::vector<int>(legal_actions.size());
 		for (int i = 0; i < legal_actions.size(); i++) {
-			for (int _ = 0; _ < 100; _++) {
+			for (int _ = 0; _ < MONTECALRO_SEARCH_COUNT; _++) {
 				values[i] += -playout(state.next(legal_actions[i]));
 			}
 		}
@@ -89,8 +93,8 @@ public:
 		int w, n;
 		std::vector<Node> child_nodes;
 	public:
-		Node(SimpleState state):state(state),w(0),n(0) {}
-		int evaluate(MonteCalroTreeAgent &agent) {
+		Node(SimpleState state) :state(state), w(0), n(0) {}
+		int evaluate(MonteCalroTreeAgent& agent) {
 			if (this->state.is_done()) {
 				int value = this->state.is_lose() ? -1 : 0;
 				this->w += value;
@@ -102,7 +106,7 @@ public:
 				int value = agent.playout(this->state);
 				this->w += value;
 				this->n++;
-				if (this->n == 10) {
+				if (this->n == MCTS_EXPAND_LIMIT) {
 					expand();
 				}
 				return value;
@@ -124,7 +128,7 @@ public:
 		}
 
 		Node& next_child_node() {
-			for (auto &child_node : this->child_nodes) {
+			for (auto& child_node : this->child_nodes) {
 				if (child_node.n == 0)return child_node;
 			}
 			int t = 0;
@@ -159,10 +163,13 @@ public:
 	std::pair<int, int> select_action(SimpleState state) {
 		Node root_node = Node(state);
 		root_node.expand();
-		for (int i = 0; i < 300; i++) {
+		for (int i = 0; i < MONTECALRO_TREE_SEARCH_COUNT; i++) {
 			root_node.evaluate(*this);
 		}
 		auto legal_actions = state.legal_actions();
+		// パス以外ができるならパスを除外
+		if (legal_actions.size() > 1)legal_actions.pop_back();
+
 		std::vector<int> n_list;
 		for (auto child_node : root_node.get_child_nodes()) {
 			n_list.push_back(child_node.get_n());

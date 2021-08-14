@@ -12,7 +12,7 @@ void Main()
 	FontAsset::Register(U"Score", 36, Typeface::Bold);
 	FontAsset::Register(U"Info", 36, Typeface::Bold);
 	FontAsset::Register(U"Result", 60, Typeface::Bold);
-
+	FontAsset::Register(U"ResultSmall", 36, Typeface::Bold);
 
 
 	// 背景色を設定
